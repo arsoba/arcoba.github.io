@@ -1,30 +1,123 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <title>Untappd feed</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>    
+
+    <style>
+        html, body, #wrapper {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 100%;
+            width: 100%;        
+        }
+    </style>
 </head>
-
 <body>
+    <div id='wrapper'>
+        <div id="map"></div>
+   </div>
 
-<script>
+    <script type="text/javascript">
 
-navigator.bluetooth.requestDevice({ filters: [{ services: ['battery_service'] }] })
-.then(device => device.gatt.connect())
-.then(server => {
-  // Getting Battery Service...
-  return server.getPrimaryService('battery_service');
-})
-.then(service => {
-  // Getting Battery Level Characteristic...
-  return service.getCharacteristic('battery_level');
-})
-.then(characteristic => {
-  // Reading Battery Level...
-  return characteristic.readValue();
-})
-.then(value => {
-  document.write('Battery percentage is ' + value.getUint8(0) + '<br>');
-})
-.catch(error => { console.log(error); });
+        var map;
 
-</script>
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: 30, lng: 0},
+                zoom: 2
+            });
+        }
 
+        var Checkins = function() {
+
+            this.checkinsList = [];
+            this.checkinsCount = 50;
+            this.previousCheckin;
+
+            this.getCheckins = function() {
+                var self = this;
+                $.ajax({
+                    url: "https://api.untappd.com/v4/thepub?client_id=427b3d18fa15915b814ed3e6ff635b36&client_secret=27a39f3d808b0c279d5e1dff707f94b8",
+                    success: function(data) {
+                        for (var i = data.response.checkins.items.length - 1; i >= 0 ; i--) {
+                            var checkin = data.response.checkins.items[i];
+                            if(checkin.venue.length !== 0) {
+                                self.addCheckin({
+                                    checkin_id: checkin.checkin_id,
+                                    cord: {
+                                        lat: checkin.venue.location.lat, 
+                                        lng: checkin.venue.location.lng
+                                        },
+                                    created_at: new Date(checkin.created_at)
+                                });
+                            }
+                        }
+                    },
+                    error: function() {
+                        console.log('error');
+                    }      
+                });
+            };
+
+            this.addCheckin = function(checkin) {
+                if(!this.ifExistCheckin(checkin)) {
+                    if(!this.previousCheckin) {
+                        this.previousCheckin = checkin.created_at;
+                        var sleepTime = 0;
+                    } else {
+                        var sleepTime = Math.abs(checkin.created_at - this.previousCheckin);
+                        this.previousCheckin = checkin.created_at;
+                    }
+
+                    checkin.marker = this.addCheckinMarker(checkin);
+                    
+                    var newLength = this.checkinsList.push(checkin);
+
+                    if(newLength > this.checkinsCount) {
+                        var deletedCheckin = this.checkinsList.shift();
+                        deletedCheckin.marker.setMap(null);
+                    }
+                }
+            };
+
+            this.addCheckinMarker = function(checkin) {
+                return new google.maps.Marker({
+                        position: checkin.cord,
+                        map: map
+                });
+            };
+
+            this.ifExistCheckin = function(checkin) {
+                for (var i = 0; i < this.checkinsList.length; i++) {
+                    if(checkin.checkin_id == this.checkinsList[i].checkin_id) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        }
+
+        $(document).ready(function() {
+            var checkins = new Checkins();
+            checkins.getCheckins();
+            (function myLoop () {          
+                setTimeout(function () {   
+                    checkins.getCheckins();               
+                    myLoop();
+                }, 2000)
+            })();
+        });
+
+    </script>
+
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8ZpvEevXkO0d9vmiQ7NbRuvh5NJtPwXQ&callback=initMap"></script>
+    
 </body>
+</html>
