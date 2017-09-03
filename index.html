@@ -38,7 +38,9 @@
         var Checkins = function() {
 
             this.checkinsList = [];
-            this.checkinsCount = 50;
+            this.markersList = [];
+            this.checkinIds = [];
+            this.checkinsCount = 100;
             this.previousCheckin;
 
             this.getCheckins = function() {
@@ -46,9 +48,11 @@
                 $.ajax({
                     url: "https://api.untappd.com/v4/thepub?client_id=427b3d18fa15915b814ed3e6ff635b36&client_secret=27a39f3d808b0c279d5e1dff707f94b8",
                     success: function(data) {
+                        var checkinsIds = [];
                         for (var i = data.response.checkins.items.length - 1; i >= 0 ; i--) {
                             var checkin = data.response.checkins.items[i];
                             if(checkin.venue.length !== 0) {
+                                checkinsIds.push(checkin.checkin_id);
                                 self.addCheckin({
                                     checkin_id: checkin.checkin_id,
                                     cord: {
@@ -59,6 +63,7 @@
                                 });
                             }
                         }
+                        self.checkinIds = checkinsIds;
                     },
                     error: function() {
                         console.log('error');
@@ -67,36 +72,37 @@
             };
 
             this.addCheckin = function(checkin) {
-                if(!this.ifExistCheckin(checkin)) {
-                    if(!this.previousCheckin) {
-                        this.previousCheckin = checkin.created_at;
-                        var sleepTime = 0;
-                    } else {
-                        var sleepTime = Math.abs(checkin.created_at - this.previousCheckin);
-                        this.previousCheckin = checkin.created_at;
-                    }
+                if(!this.ifExistCheckin(checkin)) { 
+                    this.checkinIds.push(checkin.checkin_id);                   
+                    this.checkinsList.push(checkin);
+                }
+            };
 
+            this.drawMarkers = function() {
+                var checkin = this.checkinsList.shift();
+                if(checkin) {
                     checkin.marker = this.addCheckinMarker(checkin);
-                    
-                    var newLength = this.checkinsList.push(checkin);
+                    this.markersList.push(checkin);
+                }
 
-                    if(newLength > this.checkinsCount) {
-                        var deletedCheckin = this.checkinsList.shift();
-                        deletedCheckin.marker.setMap(null);
-                    }
+                if(this.markersList.length > this.checkinsCount) {
+                    var checkinMarker = this.markersList.shift();
+                   
+                    checkinMarker.marker.setMap(null);
                 }
             };
 
             this.addCheckinMarker = function(checkin) {
                 return new google.maps.Marker({
-                        position: checkin.cord,
-                        map: map
+                    position: checkin.cord,
+                    map: map,
+                    animation: google.maps.Animation.DROP
                 });
             };
 
             this.ifExistCheckin = function(checkin) {
-                for (var i = 0; i < this.checkinsList.length; i++) {
-                    if(checkin.checkin_id == this.checkinsList[i].checkin_id) {
+                for (var i = 0; i < this.checkinIds.length; i++) {
+                    if(checkin.checkin_id == this.checkinIds[i]) {
                         return true;
                     }
                 }
@@ -104,15 +110,25 @@
             };
         }
 
+        var checkins = new Checkins();
+
         $(document).ready(function() {
-            var checkins = new Checkins();
+
             checkins.getCheckins();
             (function myLoop () {          
                 setTimeout(function () {   
                     checkins.getCheckins();               
                     myLoop();
-                }, 2000)
+                }, 1000)
             })();
+
+            (function myLoop () {          
+                setTimeout(function () {   
+                    checkins.drawMarkers();               
+                    myLoop();
+                }, 100)
+            })();
+            
         });
 
     </script>
