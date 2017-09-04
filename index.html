@@ -27,11 +27,17 @@
     <script type="text/javascript">
 
         var map;
+        var heatmap;
 
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 center: {lat: 30, lng: 0},
                 zoom: 2
+            });
+
+            heatmap = new google.maps.visualization.HeatmapLayer({
+                data: [],
+                map: map
             });
         }
 
@@ -81,23 +87,26 @@
             this.drawMarkers = function() {
                 var checkin = this.checkinsList.shift();
                 if(checkin) {
-                    checkin.marker = this.addCheckinMarker(checkin);
-                    this.markersList.push(checkin);
+                    this.markersList.push(
+                        new google.maps.LatLng(checkin.cord.lat, checkin.cord.lng)
+                    );
+                    checkin.marker = this.addCheckinMarker(this.markersList);
                 }
 
                 if(this.markersList.length > this.checkinsCount) {
                     var checkinMarker = this.markersList.shift();
-                   
-                    checkinMarker.marker.setMap(null);
                 }
             };
 
             this.addCheckinMarker = function(checkin) {
+                /*
                 return new google.maps.Marker({
                     position: checkin.cord,
                     map: map,
                     animation: google.maps.Animation.DROP
                 });
+                */
+                heatmap.setData(checkin);
             };
 
             this.ifExistCheckin = function(checkin) {
@@ -133,7 +142,7 @@
 
     </script>
 
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8ZpvEevXkO0d9vmiQ7NbRuvh5NJtPwXQ&callback=initMap"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8ZpvEevXkO0d9vmiQ7NbRuvh5NJtPwXQ&callback=initMap&libraries=visualization"></script>
     
 </body>
 </html>
